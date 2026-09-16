@@ -272,6 +272,12 @@ tr.open td{background:#fffbeb}
         <textarea id="sFb" rows="8" style="width:100%;font-family:monospace;font-size:13px" placeholder='{ "apiKey": "...", "authDomain": "...", "databaseURL": "...", "projectId": "...", ... }'></textarea>
         <div class="row" style="margin-top:8px"><button class="btn" onclick="saveFb()">저장 후 새로고침</button><button class="btn gray" onclick="clearFb()">이 기기 설정 지우기</button></div>
       </div>
+      <div class="card" style="border:1px solid #fca5a5">
+        <h3 style="color:#b91c1c">테스트 기록 초기화</h3>
+        <p class="muted">실제 운영 전 테스트로 올린 출퇴근·휴가 기록을 지웁니다. <b>직원 목록·설정·비밀번호는 그대로</b> 유지됩니다. 지우기 전에 백업 JSON이 자동으로 다운로드됩니다.</p>
+        <div class="row"><label>기간 삭제</label><input type="date" id="sDelFrom"> ~ <input type="date" id="sDelTo"> <button class="btn gray" onclick="resetRange()">이 기간 기록만 삭제</button></div>
+        <div class="row" style="margin-top:8px"><button class="btn" style="background:#b91c1c" onclick="resetAll()">출퇴근·휴가 기록 전체 삭제</button></div>
+      </div>
       <div class="card">
         <h3>출퇴근 데이터 백업</h3>
         <div class="row"><button class="btn gray" onclick="backupAll()">전체 기록 JSON 다운로드</button><label class="btn gray" style="cursor:pointer">복원(JSON) <input type="file" accept=".json" style="display:none" onchange="restoreAll(this)"></label></div>
@@ -308,7 +314,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.09.16a';
+const APP_VER = 'v2026.09.16b';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -681,6 +687,24 @@ function saveRules(){ dbWrite('settings/lunchMin',Number(document.getElementById
 function changePw(){ const a=document.getElementById('sPw1').value,b=document.getElementById('sPw2').value; if(!a||a!==b){toast('비밀번호가 일치하지 않습니다');return;} dbWrite('settings/adminPw',a); document.getElementById('sPw1').value=document.getElementById('sPw2').value=''; toast('비밀번호 변경됨'); }
 function saveFb(){ let t=document.getElementById('sFb').value.trim(); if(!t){toast('설정을 붙여넣으세요');return;} try{ t=t.replace(/^\s*(const|var|let)\s+\w+\s*=\s*/,'').replace(/;\s*$/,''); const cfg=(new Function('return ('+t+')'))(); if(!cfg.databaseURL) throw new Error('databaseURL 없음'); LS.set('att_fb',cfg); location.reload(); }catch(e){toast('형식 오류: '+e.message);} }
 function clearFb(){ localStorage.removeItem('att_fb'); location.reload(); }
+function resetRange(){
+  const a=document.getElementById('sDelFrom').value, b=document.getElementById('sDelTo').value; if(!a||!b||a>b){toast('기간을 확인하세요');return;}
+  const days=Object.keys(S.records||{}).filter(d=>d>=a&&d<=b); const lv=Object.entries(S.leaves||{}).filter(([k,l])=>l.start<=b&&l.end>=a);
+  if(!days.length&&!lv.length){toast('해당 기간 기록 없음');return;}
+  if(!confirm(`${a} ~ ${b} 출퇴근 ${days.length}일치 · 휴가 ${lv.length}건을 삭제합니다. 되돌릴 수 없습니다. 계속할까요?`))return;
+  backupAll();
+  days.forEach(d=>{ if(db) ref('records/'+d).remove(); delete S.records[d]; });
+  lv.forEach(([k])=>{ if(db) ref('leaves/'+k).remove(); delete S.leaves[k]; });
+  LS.set('att_cache',S); rerender(); toast('삭제 완료');
+}
+function resetAll(){
+  const n=Object.keys(S.records||{}).length, m=Object.keys(S.leaves||{}).length;
+  if(!confirm(`출퇴근 기록 ${n}일치와 휴가 ${m}건을 모두 삭제합니다. 직원·설정은 유지됩니다.\n되돌릴 수 없습니다. 계속할까요?`))return;
+  if(prompt('확인을 위해 "삭제" 라고 입력하세요')!=='삭제'){toast('취소됨');return;}
+  backupAll();
+  if(db){ ref('records').remove(); ref('leaves').remove(); }
+  S.records={}; S.leaves={}; LS.set('att_cache',S); rerender(); toast('전체 기록 삭제 완료 — 직원·설정 유지');
+}
 function backupAll(){ download(`출퇴근_백업_${todayStr()}.json`,JSON.stringify(S,null,2),'application/json'); }
 function restoreAll(inp){ const f=inp.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=()=>{ try{ const v=JSON.parse(rd.result); if(!v.employees||!v.records) throw 0; if(!confirm('현재 데이터를 백업 파일로 덮어씁니다. 계속할까요?'))return; if(db) ref().set(v); S=v; LS.set('att_cache',S); rerender(); toast('복원 완료'); }catch(e){toast('올바른 백업 파일이 아닙니다');} }; rd.readAsText(f); inp.value=''; }
 
