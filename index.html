@@ -243,8 +243,8 @@ tr.open td{background:#fffbeb}
       </div>
       <div class="card">
         <h3>직원 목록 <span class="muted">(순서 = 화면 순서 · 각 태블릿에는 설정된 회사의 직원만 표시)</span></h3>
-        <div class="tbl-wrap"><table><thead><tr><th>순서</th><th>이름 <span class="muted" style="font-weight:400">(칸에서 바로 수정 → Enter)</span></th><th>회사</th><th>태블릿 표시</th><th>상태</th><th></th></tr></thead><tbody id="eBody"></tbody></table></div>
-        <p class="muted">퇴사자는 "비활성"으로 바꾸면 태블릿·입력표에서 사라지고 기록은 남습니다. ATM 직원이 고기마을에서도 알바하면 "양쪽 태블릿"으로 두세요 — 고기마을에서 찍은 시간은 기록에 '고기마을'로 표시되고 직원관리 앱에서 캐쉬 알바로 계산됩니다. 시급·세금신고액 등 급여 정보는 직원관리 앱에서 관리합니다.</p>
+        <div class="tbl-wrap"><table><thead><tr><th>순서</th><th>이름 <span class="muted" style="font-weight:400">(칸에서 바로 수정 → Enter)</span></th><th>회사</th><th>태블릿 표시</th><th>토요일</th><th>상태</th><th></th></tr></thead><tbody id="eBody"></tbody></table></div>
+        <p class="muted">퇴사자는 "비활성"으로 바꾸면 태블릿·입력표에서 사라지고 기록은 남습니다. ATM 직원이 고기마을에서도 알바하면 "양쪽 태블릿"으로 두세요 — 고기마을에서 찍은 시간은 기록에 '고기마을'로 표시되고 직원관리 앱에서 캐쉬 알바로 계산됩니다. 시급·세금신고액 등 급여 정보는 직원관리 앱에서 관리합니다. "토요일 출근만(일당)"을 켜면 그 직원은 토요일에 출근 버튼만 누르면 되고(퇴근 없음), 일당은 직원관리 앱의 토요일 일당 설정으로 계산됩니다.</p>
       </div>
     </div>
 
@@ -308,7 +308,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.09.15d';
+const APP_VER = 'v2026.09.16a';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -347,6 +347,7 @@ function calcBreak(r){
   return (m/60)>=(st.lunchMinHours||0) ? (st.lunchMin||0) : 0;
 }
 function calcHours(r){
+  if(r.satFlat) return 0;
   if(r.hours!=null) return r.hours;
   if(!r.out) return null;
   let m=toMin(r.out)-toMin(r.in); if(m<0) m+=1440;
@@ -364,7 +365,7 @@ function recsBetween(from,to,empId){
 }
 function openRec(empId){
   let best=null;
-  for(const d in S.records) for(const id in S.records[d]){const r=S.records[d][id]; if(r.empId===empId&&r.hours==null&&!r.out){ if(!best||d>best.date||(d===best.date&&r.in>best.in)) best={date:d,id,...r}; }}
+  for(const d in S.records) for(const id in S.records[d]){const r=S.records[d][id]; if(r.empId===empId&&r.hours==null&&!r.out&&!r.satFlat){ if(!best||d>best.date||(d===best.date&&r.in>best.in)) best={date:d,id,...r}; }}
   return best;
 }
 const LTYPE={AL:'연차',UL:'무급휴가',SL:'병가',OT:'기타'};
@@ -431,7 +432,7 @@ function renderKiosk(){
     if(lv){cls='off';st='휴가중 ~'+lv.end.slice(5).replace('-','/');}
     else if(o&&o.date===today){cls='in';st='출근 '+o.in+' · 근무중';inCount++;}
     else if(o){cls='warn';st=o.date.slice(5).replace('-','/')+' 퇴근 미기록';}
-    else { const t=Object.values(S.records[today]||{}).filter(r=>r.empId===e.id&&r.out).sort((a,b)=>b.out.localeCompare(a.out))[0]; if(t){st='퇴근 '+t.out;} }
+    else { const sf=Object.values(S.records[today]||{}).find(r=>r.empId===e.id&&r.satFlat); if(sf){cls='done';st='토요일 출근 '+sf.in+' ✓';} else { const t=Object.values(S.records[today]||{}).filter(r=>r.empId===e.id&&r.out).sort((a,b)=>b.out.localeCompare(a.out))[0]; if(t){st='퇴근 '+t.out;} } }
     return `<button class="emp ${cls}" onclick="tapEmp('${e.id}')"><span class="nm">${esc(e.name)}</span>${e.company!==co?'<span class="co-tag">'+coName(e.company)+' 직원</span>':''}<span class="st">${st}</span></button>`;
   }).join('');
   document.getElementById('kInCount').textContent=inCount?`현재 근무중 ${inCount}명`:'';
@@ -442,7 +443,12 @@ function showMd(html){ closeMd(); mdEl=document.createElement('div'); mdEl.class
 function tapEmp(id){
   const e=S.employees[id]; if(!e) return; const o=openRec(id); const today=todayStr(); const now=fmtTime(new Date());
   let html=`<h2>${esc(e.name)}</h2>`;
-  if(o&&o.date===today){
+  const satToday=e.satOnly&&new Date().getDay()===6; const satDone=satToday&&Object.values(S.records[today]||{}).some(r=>r.empId===id&&r.satFlat);
+  if(satDone){
+    html+=`<div class="sub">오늘 토요일 출근이 이미 기록됐습니다.<br><b>퇴근 기록은 필요 없습니다.</b></div>`;
+  } else if(satToday){
+    html+=`<div class="sub">토요일 근무 — <b>출근만</b> 누르면 됩니다.<br>지금 시간 <b>${now}</b></div><button class="big in" onclick="doSat('${id}')">토요일 출근</button>`;
+  } else if(o&&o.date===today){
     html+=`<div class="sub">오늘 <b>${o.in}</b>에 출근했습니다.<br>지금 시간 <b>${now}</b></div><button class="big out" onclick="doOut('${id}','${o.date}','${o.id}')">퇴근</button>`;
   } else {
     if(o) html+=`<div class="note">⚠ ${o.date.slice(5).replace('-','/')} ${o.in} 출근 후 퇴근 기록이 없습니다.<br>사장님께 알려주세요. (오늘 출근은 정상 기록됩니다)</div>`;
@@ -455,6 +461,13 @@ function doIn(id){
   const now=new Date(); const d=fmtDate(now); const rid=uid();
   dbWrite(`records/${d}/${rid}`,{empId:id,in:fmtTime(now),out:null,breakAuto:true,breakMin:null,note:'',src:'kiosk',site:kioskCo(),ts:now.getTime()});
   finishMd('출근',id,fmtTime(now),null);
+}
+function doSat(id){
+  const now=new Date(); const d=fmtDate(now); const rid=uid();
+  dbWrite(`records/${d}/${rid}`,{empId:id,in:fmtTime(now),out:null,satFlat:true,breakAuto:false,breakMin:0,note:'토요일 일당',src:'kiosk',site:kioskCo(),ts:now.getTime()});
+  const e=S.employees[id];
+  showMd(`<div class="done-md"><div class="icon">☀️</div><h2>${esc(e.name)} 토요일 출근 완료</h2><div class="tm">${fmtTime(now)}</div><div class="count">퇴근 기록은 필요 없습니다 · <span id="cd">${S.settings.autoClose||6}</span>초 후 닫힘</div><button class="cancel" style="margin-top:14px" onclick="closeMd()">확인</button></div>`);
+  let n=S.settings.autoClose||6; autoT=setInterval(()=>{n--; const c=document.getElementById('cd'); if(c)c.textContent=n; if(n<=0){closeMd();}},1000);
 }
 function doOut(id,d,rid){
   const now=new Date(); const r=S.records[d][rid]; const outT=fmtTime(now);
@@ -477,7 +490,7 @@ function showMine(id,offset){
     const rs=Object.values(S.records[d]||{}).filter(r=>r.empId===id).sort((a,b)=>(a.in||'').localeCompare(b.in||''));
     const {h,open}=hoursOn(d,id); if(i<7) w1+=h; else w2+=h;
     const cls=(dow===6?'sat':dow===0?'sun':'');
-    const inT=(rs[0]?rs[0].in:'')+((rs[0]&&rs[0].site&&rs[0].site!==e.company)?' <small style="color:var(--mw)">'+coName(rs[0].site)+'</small>':''), outT=rs.length?(rs[rs.length-1].out||'<span class="warn-txt">미기록</span>'):''; const lv=leaveOn(d,id);
+    const inT=(rs[0]?rs[0].in+(rs[0].satFlat?' <small style="color:var(--amber)">일당</small>':''):'')+((rs[0]&&rs[0].site&&rs[0].site!==e.company)?' <small style="color:var(--mw)">'+coName(rs[0].site)+'</small>':''), outT=rs.length?(rs[rs.length-1].satFlat?'—':(rs[rs.length-1].out||'<span class="warn-txt">미기록</span>')):''; const lv=leaveOn(d,id);
     rows+=`<tr class="${cls}"><td>${d.slice(5).replace('-','/')} (${DOW[dow]})${d===today?' ●':''}</td>`+(lv&&!rs.length?`<td colspan="3" style="color:var(--amber);font-weight:700">${LTYPE[lv.type]||'휴가'}</td></tr>`:`<td class="${inT?'':'dim'}">${inT||'-'}</td><td class="${rs.length?'':'dim'}">${outT||'-'}</td><td class="${rs.length?'':'dim'}">${rs.length?(open&&!h?'-':h.toFixed(2)):'-'}</td></tr>`);
     if(i===6) rows+=`<tr class="wk"><td colspan="3">1주차 합계 <small style="font-weight:400;color:var(--muted)">(30분 단위)</small></td><td>${roundHalf(w1).toFixed(1)}h</td></tr>`;
   }
@@ -529,16 +542,16 @@ function fillEmpSelects(){
 }
 function rowHtml(r,showDate){
   const h=calcHours(r); const b=calcBreak(r); const manual=r.hours!=null;
-  return `<tr class="${(!manual&&!r.out)?'open':''}">${showDate?`<td>${r.date} (${DOW[parseDate(r.date).getDay()]})</td>`:''}<td>${esc(empName(r.empId))}</td><td><span class="tag ${empCo(r.empId)}">${coName(empCo(r.empId))}</span></td><td>${manual?'<span class="muted">수동입력</span>':r.in}${(r.site&&r.site!==empCo(r.empId))?' <span class="tag MW" style="font-size:10px">'+coName(r.site)+'</span>':''}</td><td>${manual?'':(r.out||'<span class="warn-txt">미기록</span>')}</td><td class="num">${manual?'':b+(r.breakAuto===false?'*':'')}</td><td class="num">${h==null?'-':h.toFixed(2)}</td>${showDate?`<td class="muted">${esc(r.note||'')}${r.edited?' ✎':''}</td>`:''}<td><button class="btn gray sm" onclick="openEdit('${r.date}','${r.id}')">수정</button></td></tr>`;
+  return `<tr class="${(!manual&&!r.out&&!r.satFlat)?'open':''}">${showDate?`<td>${r.date} (${DOW[parseDate(r.date).getDay()]})</td>`:''}<td>${esc(empName(r.empId))}</td><td><span class="tag ${empCo(r.empId)}">${coName(empCo(r.empId))}</span></td><td>${manual?'<span class="muted">수동입력</span>':r.in}${(r.site&&r.site!==empCo(r.empId))?' <span class="tag MW" style="font-size:10px">'+coName(r.site)+'</span>':''}</td><td>${manual?'':(r.satFlat?'<span class="muted">일당(퇴근 없음)</span>':(r.out||'<span class="warn-txt">미기록</span>'))}</td><td class="num">${manual?'':b+(r.breakAuto===false?'*':'')}</td><td class="num">${h==null?'-':h.toFixed(2)}</td>${showDate?`<td class="muted">${esc(r.note||'')}${r.edited?' ✎':''}</td>`:''}<td><button class="btn gray sm" onclick="openEdit('${r.date}','${r.id}')">수정</button></td></tr>`;
 }
 let todayCo='';
 function setTodayCo(btn){ todayCo=btn.dataset.co; btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===btn)); renderToday(); }
 function renderToday(){
   const d=todayStr(); document.getElementById('tDate').textContent=d+(todayCo?' · '+coName(todayCo):'');
-  const rs=recsBetween(d,d).filter(r=>r.hours==null&&(!todayCo||empCo(r.empId)===todayCo)); const working=rs.filter(r=>!r.out).length; const done=rs.filter(r=>r.out).length; const hrs=rs.reduce((a,r)=>a+(calcHours(r)||0),0);
+  const rs=recsBetween(d,d).filter(r=>r.hours==null&&(!todayCo||empCo(r.empId)===todayCo)); const working=rs.filter(r=>!r.out&&!r.satFlat).length; const done=rs.filter(r=>r.out||r.satFlat).length; const hrs=rs.reduce((a,r)=>a+(calcHours(r)||0),0);
   document.getElementById('tKpi').innerHTML=`<div><b>${working}</b><span>현재 근무중</span></div><div><b>${done}</b><span>퇴근 완료</span></div><div><b>${hrs.toFixed(2)}h</b><span>오늘 근무시간 합계</span></div><div><b>${sortedEmps(true,todayCo||null).length}</b><span>${todayCo?coName(todayCo):'전체'} 직원</span></div>${(n=>n?`<div style="background:#fffbeb"><b style="color:var(--amber)">${n}</b><span>휴가 신청 대기</span></div>`:'')(Object.values(S.leaves||{}).filter(l=>l.status==='req').length)}`;
   document.getElementById('tBody').innerHTML=rs.length?rs.map(r=>rowHtml(r,false)).join(''):'<tr><td colspan="7" class="muted">오늘 기록 없음</td></tr>';
-  const opens=recsBetween('0000','9999').filter(r=>r.hours==null&&!r.out&&r.date<d&&(!todayCo||empCo(r.empId)===todayCo));
+  const opens=recsBetween('0000','9999').filter(r=>r.hours==null&&!r.out&&!r.satFlat&&r.date<d&&(!todayCo||empCo(r.empId)===todayCo));
   document.getElementById('tOpenCard').classList.toggle('hidden',!opens.length);
   document.getElementById('tOpenBody').innerHTML=opens.map(r=>`<tr class="open"><td>${r.date}</td><td>${esc(empName(r.empId))}</td><td>${r.in}</td><td><button class="btn sm" onclick="openEdit('${r.date}','${r.id}')">퇴근시간 입력</button></td></tr>`).join('');
 }
@@ -597,7 +610,7 @@ function setPeriodCo(btn){ periodCo=btn.dataset.co; btn.parentElement.querySelec
 function periodData(){
   const [from,to]=periodRange(); const mid=addDays(from,7); const rs=recsBetween(from,to).filter(r=>!periodCo||empCo(r.empId)===periodCo); const by={};
   for(const r of rs){ const o=by[r.empId]=by[r.empId]||{empId:r.empId,name:empName(r.empId),company:empCo(r.empId),days:new Set(),h:0,w1:0,w2:0,missing:0,alt:0,records:[]};
-    const h=calcHours(r); if(h!=null&&r.site&&r.site!==o.company) o.alt+=h; if(h==null){o.missing++;} else { o.h+=h; if(r.date<mid)o.w1+=h; else o.w2+=h; o.days.add(r.date);} o.records.push({date:r.date,in:r.in||null,out:r.out||null,breakMin:calcBreak(r),hours:h,note:r.note||'',site:r.site||empCo(r.empId)}); }
+    const h=calcHours(r); if(h!=null&&r.site&&r.site!==o.company) o.alt+=h; if(h==null){o.missing++;} else { o.h+=h; if(r.date<mid)o.w1+=h; else o.w2+=h; o.days.add(r.date);} o.records.push({date:r.date,in:r.in||null,out:r.out||null,breakMin:calcBreak(r),hours:h,note:r.note||'',site:r.site||empCo(r.empId),satFlat:!!r.satFlat}); }
   return {from,to,rows:Object.values(by).sort((a,b)=>(S.employees[a.empId]?.order??999)-(S.employees[b.empId]?.order??999))};
 }
 function renderPeriod(){
@@ -651,7 +664,7 @@ function deleteEdit(){ if(!confirm('이 기록을 삭제할까요?'))return; dbW
 function renderEmps(){
   const ae=document.activeElement; if(ae&&ae.closest&&ae.closest('#eBody')&&ae.tagName==='INPUT') return; // 입력 중엔 표를 다시 그리지 않음
   const emps=sortedEmps(false);
-  document.getElementById('eBody').innerHTML=emps.map(e=>`<tr><td><button class="btn gray sm" onclick="moveEmp('${e.id}',-1)">▲</button> <button class="btn gray sm" onclick="moveEmp('${e.id}',1)">▼</button></td><td><input type="text" value="${esc(e.name)}" onchange="if(this.value.trim()) dbWrite('employees/${e.id}/name',this.value.trim())" onkeydown="if(event.key==='Enter') this.blur()" style="width:140px" title="이름 수정 후 Enter 또는 다른 곳 클릭"></td><td><select onchange="dbWrite('employees/${e.id}/company',this.value)"><option value="ATM" ${e.company==='ATM'?'selected':''}>ATM</option><option value="MW" ${e.company==='MW'?'selected':''}>고기마을</option></select></td><td><select onchange="dbWrite('employees/${e.id}/sites',this.value)"><option value="" ${e.sites!=='BOTH'?'selected':''}>소속 회사만</option><option value="BOTH" ${e.sites==='BOTH'?'selected':''}>양쪽 태블릿</option></select></td><td><select onchange="dbWrite('employees/${e.id}/active',this.value==='1')"><option value="1" ${e.active!==false?'selected':''}>활성</option><option value="0" ${e.active===false?'selected':''}>비활성</option></select></td><td><button class="btn red sm" onclick="delEmp('${e.id}')">삭제</button></td></tr>`).join('')||'<tr><td colspan="6" class="muted">직원 없음</td></tr>';
+  document.getElementById('eBody').innerHTML=emps.map(e=>`<tr><td><button class="btn gray sm" onclick="moveEmp('${e.id}',-1)">▲</button> <button class="btn gray sm" onclick="moveEmp('${e.id}',1)">▼</button></td><td><input type="text" value="${esc(e.name)}" onchange="if(this.value.trim()) dbWrite('employees/${e.id}/name',this.value.trim())" onkeydown="if(event.key==='Enter') this.blur()" style="width:140px" title="이름 수정 후 Enter 또는 다른 곳 클릭"></td><td><select onchange="dbWrite('employees/${e.id}/company',this.value)"><option value="ATM" ${e.company==='ATM'?'selected':''}>ATM</option><option value="MW" ${e.company==='MW'?'selected':''}>고기마을</option></select></td><td><select onchange="dbWrite('employees/${e.id}/sites',this.value)"><option value="" ${e.sites!=='BOTH'?'selected':''}>소속 회사만</option><option value="BOTH" ${e.sites==='BOTH'?'selected':''}>양쪽 태블릿</option></select></td><td><label style="cursor:pointer;white-space:nowrap"><input type="checkbox" ${e.satOnly?'checked':''} onchange="dbWrite('employees/${e.id}/satOnly',this.checked)"> 출근만(일당)</label></td><td><select onchange="dbWrite('employees/${e.id}/active',this.value==='1')"><option value="1" ${e.active!==false?'selected':''}>활성</option><option value="0" ${e.active===false?'selected':''}>비활성</option></select></td><td><button class="btn red sm" onclick="delEmp('${e.id}')">삭제</button></td></tr>`).join('')||'<tr><td colspan="7" class="muted">직원 없음</td></tr>';
 }
 function addEmp(){ const n=document.getElementById('eName').value.trim(); if(!n)return; const order=sortedEmps(false).length; dbWrite('employees/'+uid(),{name:n,company:document.getElementById('eCo').value,active:true,order}); document.getElementById('eName').value=''; toast(n+' 추가됨'); }
 function bulkAddEmp(){ let order=sortedEmps(false).length; document.getElementById('eBulk').value.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{const [n,c]=l.split(',').map(s=>s.trim()); dbWrite('employees/'+uid(),{name:n,company:(c||'').toUpperCase().startsWith('M')||(c||'').includes('고기')?'MW':'ATM',active:true,order:order++});}); document.getElementById('eBulk').value=''; toast('일괄 추가 완료'); }
