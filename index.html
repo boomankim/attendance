@@ -243,8 +243,8 @@ tr.open td{background:#fffbeb}
       </div>
       <div class="card">
         <h3>직원 목록 <span class="muted">(순서 = 화면 순서 · 각 태블릿에는 설정된 회사의 직원만 표시)</span></h3>
-        <div class="tbl-wrap"><table><thead><tr><th>순서</th><th>이름 <span class="muted" style="font-weight:400">(칸에서 바로 수정 → Enter)</span></th><th>회사</th><th>태블릿 표시</th><th>토요일</th><th>상태</th><th></th></tr></thead><tbody id="eBody"></tbody></table></div>
-        <p class="muted">퇴사자는 "비활성"으로 바꾸면 태블릿·입력표에서 사라지고 기록은 남습니다. ATM 직원이 고기마을에서도 알바하면 "양쪽 태블릿"으로 두세요 — 고기마을에서 찍은 시간은 기록에 '고기마을'로 표시되고 직원관리 앱에서 캐쉬 알바로 계산됩니다. 시급·세금신고액 등 급여 정보는 직원관리 앱에서 관리합니다. "토요일 출근만(일당)"을 켜면 그 직원은 토요일에 출근 버튼만 누르면 되고(퇴근 없음), 일당은 직원관리 앱의 토요일 일당 설정으로 계산됩니다.</p>
+        <div class="tbl-wrap"><table><thead><tr><th>순서</th><th>이름 <span class="muted" style="font-weight:400">(칸에서 바로 수정 → Enter)</span></th><th>회사</th><th>태블릿 표시</th><th>토요일</th><th>점심 차감</th><th>상태</th><th></th></tr></thead><tbody id="eBody"></tbody></table></div>
+        <p class="muted">퇴사자는 "비활성"으로 바꾸면 태블릿·입력표에서 사라지고 기록은 남습니다. ATM 직원이 고기마을에서도 알바하면 "양쪽 태블릿"으로 두세요 — 고기마을에서 찍은 시간은 기록에 '고기마을'로 표시되고 직원관리 앱에서 캐쉬 알바로 계산됩니다. 시급·세금신고액 등 급여 정보는 직원관리 앱에서 관리합니다. "토요일 출근만(일당)"을 켜면 그 직원은 토요일에 출근 버튼만 누르면 되고(퇴근 없음), 일당은 직원관리 앱의 토요일 일당 설정으로 계산됩니다. "점심 차감 없음"을 켜면 그 직원은 점심시간 자동 차감(설정의 30분)을 적용하지 않습니다 — 수정 화면에서 휴게시간을 직접 넣은 기록은 그대로 따릅니다.</p>
       </div>
     </div>
 
@@ -314,7 +314,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.09.16b';
+const APP_VER = 'v2026.09.16c';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -349,6 +349,7 @@ function calcBreak(r){
   if(r.breakMin!=null && !r.breakAuto) return r.breakMin;
   if(!r.out) return 0;
   let m=toMin(r.out)-toMin(r.in); if(m<0) m+=1440;
+  const emp=S.employees[r.empId]; if(emp&&emp.noLunch) return 0;   // 직원별 점심 차감 없음
   const st=S.settings;
   return (m/60)>=(st.lunchMinHours||0) ? (st.lunchMin||0) : 0;
 }
@@ -670,7 +671,7 @@ function deleteEdit(){ if(!confirm('이 기록을 삭제할까요?'))return; dbW
 function renderEmps(){
   const ae=document.activeElement; if(ae&&ae.closest&&ae.closest('#eBody')&&ae.tagName==='INPUT') return; // 입력 중엔 표를 다시 그리지 않음
   const emps=sortedEmps(false);
-  document.getElementById('eBody').innerHTML=emps.map(e=>`<tr><td><button class="btn gray sm" onclick="moveEmp('${e.id}',-1)">▲</button> <button class="btn gray sm" onclick="moveEmp('${e.id}',1)">▼</button></td><td><input type="text" value="${esc(e.name)}" onchange="if(this.value.trim()) dbWrite('employees/${e.id}/name',this.value.trim())" onkeydown="if(event.key==='Enter') this.blur()" style="width:140px" title="이름 수정 후 Enter 또는 다른 곳 클릭"></td><td><select onchange="dbWrite('employees/${e.id}/company',this.value)"><option value="ATM" ${e.company==='ATM'?'selected':''}>ATM</option><option value="MW" ${e.company==='MW'?'selected':''}>고기마을</option></select></td><td><select onchange="dbWrite('employees/${e.id}/sites',this.value)"><option value="" ${e.sites!=='BOTH'?'selected':''}>소속 회사만</option><option value="BOTH" ${e.sites==='BOTH'?'selected':''}>양쪽 태블릿</option></select></td><td><label style="cursor:pointer;white-space:nowrap"><input type="checkbox" ${e.satOnly?'checked':''} onchange="dbWrite('employees/${e.id}/satOnly',this.checked)"> 출근만(일당)</label></td><td><select onchange="dbWrite('employees/${e.id}/active',this.value==='1')"><option value="1" ${e.active!==false?'selected':''}>활성</option><option value="0" ${e.active===false?'selected':''}>비활성</option></select></td><td><button class="btn red sm" onclick="delEmp('${e.id}')">삭제</button></td></tr>`).join('')||'<tr><td colspan="7" class="muted">직원 없음</td></tr>';
+  document.getElementById('eBody').innerHTML=emps.map(e=>`<tr><td><button class="btn gray sm" onclick="moveEmp('${e.id}',-1)">▲</button> <button class="btn gray sm" onclick="moveEmp('${e.id}',1)">▼</button></td><td><input type="text" value="${esc(e.name)}" onchange="if(this.value.trim()) dbWrite('employees/${e.id}/name',this.value.trim())" onkeydown="if(event.key==='Enter') this.blur()" style="width:140px" title="이름 수정 후 Enter 또는 다른 곳 클릭"></td><td><select onchange="dbWrite('employees/${e.id}/company',this.value)"><option value="ATM" ${e.company==='ATM'?'selected':''}>ATM</option><option value="MW" ${e.company==='MW'?'selected':''}>고기마을</option></select></td><td><select onchange="dbWrite('employees/${e.id}/sites',this.value)"><option value="" ${e.sites!=='BOTH'?'selected':''}>소속 회사만</option><option value="BOTH" ${e.sites==='BOTH'?'selected':''}>양쪽 태블릿</option></select></td><td><label style="cursor:pointer;white-space:nowrap"><input type="checkbox" ${e.satOnly?'checked':''} onchange="dbWrite('employees/${e.id}/satOnly',this.checked)"> 출근만(일당)</label></td><td><label style="cursor:pointer;white-space:nowrap"><input type="checkbox" ${e.noLunch?'checked':''} onchange="dbWrite('employees/${e.id}/noLunch',this.checked)"> 차감 없음</label></td><td><select onchange="dbWrite('employees/${e.id}/active',this.value==='1')"><option value="1" ${e.active!==false?'selected':''}>활성</option><option value="0" ${e.active===false?'selected':''}>비활성</option></select></td><td><button class="btn red sm" onclick="delEmp('${e.id}')">삭제</button></td></tr>`).join('')||'<tr><td colspan="8" class="muted">직원 없음</td></tr>';
 }
 function addEmp(){ const n=document.getElementById('eName').value.trim(); if(!n)return; const order=sortedEmps(false).length; dbWrite('employees/'+uid(),{name:n,company:document.getElementById('eCo').value,active:true,order}); document.getElementById('eName').value=''; toast(n+' 추가됨'); }
 function bulkAddEmp(){ let order=sortedEmps(false).length; document.getElementById('eBulk').value.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{const [n,c]=l.split(',').map(s=>s.trim()); dbWrite('employees/'+uid(),{name:n,company:(c||'').toUpperCase().startsWith('M')||(c||'').includes('고기')?'MW':'ATM',active:true,order:order++});}); document.getElementById('eBulk').value=''; toast('일괄 추가 완료'); }
