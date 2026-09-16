@@ -314,7 +314,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.09.16c';
+const APP_VER = 'v2026.09.16d';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -440,7 +440,7 @@ function renderKiosk(){
     else if(o&&o.date===today){cls='in';st='출근 '+o.in+' · 근무중';inCount++;}
     else if(o){cls='warn';st=o.date.slice(5).replace('-','/')+' 퇴근 미기록';}
     else { const sf=Object.values(S.records[today]||{}).find(r=>r.empId===e.id&&r.satFlat); if(sf){cls='done';st='토요일 출근 '+sf.in+' ✓';} else { const t=Object.values(S.records[today]||{}).filter(r=>r.empId===e.id&&r.out).sort((a,b)=>b.out.localeCompare(a.out))[0]; if(t){st='퇴근 '+t.out;} } }
-    return `<button class="emp ${cls}" onclick="tapEmp('${e.id}')"><span class="nm">${esc(e.name)}</span>${e.company!==co?'<span class="co-tag">'+coName(e.company)+' 직원</span>':''}<span class="st">${st}</span></button>`;
+    return `<button class="emp ${cls}" onclick="tapEmp('${e.id}')"><span class="nm">${esc(e.name)}</span><span class="st">${st}</span></button>`;
   }).join('');
   document.getElementById('kInCount').textContent=inCount?`현재 근무중 ${inCount}명`:'';
 }
