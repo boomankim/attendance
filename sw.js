@@ -1,5 +1,5 @@
 /* 출퇴근 앱 서비스워커 — 설치 가능 조건 충족용. HTML은 항상 네트워크 우선, 실패 시 캐시. */
-const CACHE='att-v2026.09.16d';
+const CACHE='att-v2026.09.16e';
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./index.html','./manifest.json','./icon-192.png','./icon-512.png']).catch(()=>{})).then(()=>self.skipWaiting())); });
 self.addEventListener('activate',e=>{ e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())); });
 self.addEventListener('fetch',e=>{
