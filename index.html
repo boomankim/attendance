@@ -315,7 +315,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.09.16e';
+const APP_VER = 'v2026.09.29a';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -713,6 +713,12 @@ function restoreAll(inp){ const f=inp.files[0]; if(!f)return; const rd=new FileR
 /* ---------- boot ---------- */
 document.getElementById('aVer').textContent=APP_VER; document.getElementById('kVer').textContent=APP_VER;
 initFirebase(); route(); renderKiosk();
+/* 화면 꺼짐 방지 (Screen Wake Lock) — 앱이 보이는 동안 태블릿 화면 유지, 첫 터치 후 활성화 */
+let wakeLock=null;
+async function keepAwake(){ try{ if('wakeLock' in navigator && document.visibilityState==='visible'){ wakeLock=await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release',()=>{wakeLock=null;}); } }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') keepAwake(); });
+['click','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{ if(!wakeLock) keepAwake(); },{passive:true}));
+keepAwake();
 if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('./sw.js').catch(()=>{}); }
 if('wakeLock' in navigator){ const req=()=>navigator.wakeLock.request('screen').catch(()=>{}); req(); document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')req();}); }
 </script>
