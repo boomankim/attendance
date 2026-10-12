@@ -29,6 +29,9 @@ input,select,textarea{font-family:inherit;font-size:16px}
 .k-head .brand small{display:block;font-weight:500;font-size:12px;color:var(--muted);letter-spacing:0;margin-top:2px}
 .k-head .logo{display:inline-block;width:34px;height:34px;line-height:34px;text-align:center;background:#0f766e;color:#fff;border-radius:10px;font-size:18px;vertical-align:middle;margin-right:6px}
 .site-chip{display:inline-block;padding:1px 8px;border-radius:999px;background:#e5e7eb;color:#374151;font-weight:700}
+.co-sw{display:inline-flex;border:1px solid #d1d5db;border-radius:999px;overflow:hidden;vertical-align:middle;margin-left:4px}
+.co-sw button{padding:3px 12px;font-size:12px;font-weight:700;background:#fff;color:#6b7280;border:0}
+.co-sw button.on{background:var(--blue);color:#fff}
 .k-head .clock{text-align:right}
 .k-head .clock .time{font-size:40px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
 .k-head .clock .date{font-size:15px;color:var(--muted);margin-top:4px}
@@ -156,6 +159,7 @@ tr.open td{background:#fffbeb}
       <h1>🕘 출퇴근 관리 <span class="muted" style="font-size:12px;font-weight:400" id="aVer"></span></h1>
       <div class="row" style="margin:0">
         <span class="muted" id="aConn"></span>
+        <span class="co-sw" title="출퇴근 화면에 표시할 회사 (이 기기)"><button id="aCoATM" onclick="setKioskCo('ATM')">ATM</button><button id="aCoMW" onclick="setKioskCo('MW')">고기마을</button></span>
         <button class="btn gray" onclick="go('#kiosk')">출퇴근 화면</button>
         <button class="btn gray" onclick="adminLogout()">로그아웃</button>
       </div>
@@ -315,7 +319,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.09.29a';
+const APP_VER = 'v2026.10.12b';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -427,7 +431,7 @@ function rerender(){ if(S.settings.periodAnchor) PERIOD_ANCHOR=S.settings.period
 /* ---------- KIOSK: 이 기기의 회사 ---------- */
 function kioskCo(){ const q=new URLSearchParams(location.search).get('co'); if(q&&(q==='ATM'||q==='MW')){ LS.set('att_kiosk_co',q); } return LS.get('att_kiosk_co','ATM'); }
 function setKioskCo(v){ LS.set('att_kiosk_co',v); rerender(); toast('이 기기: '+coName(v)+' 태블릿'); }
-function applyBrand(){ const co=kioskCo(); document.getElementById('kSite').textContent=(co==='MW'?'고기마을':'ATM')+' 태블릿'; document.title='출퇴근 기록 · '+(co==='MW'?'고기마을':'ATM'); }
+function applyBrand(){ const co=kioskCo(); document.getElementById('kSite').textContent=(co==='MW'?'고기마을':'ATM')+' 태블릿'; document.title='출퇴근 기록 · '+(co==='MW'?'고기마을':'ATM'); const a=document.getElementById('aCoATM'); if(a){ a.classList.toggle('on',co==='ATM'); document.getElementById('aCoMW').classList.toggle('on',co==='MW'); } }
 /* ---------- KIOSK ---------- */
 function tickClock(){ const n=new Date(); document.getElementById('kClockT').textContent=fmtTime(n); document.getElementById('kClockD').textContent=`${n.getFullYear()}년 ${n.getMonth()+1}월 ${n.getDate()}일 (${DOW[n.getDay()]})`; }
 setInterval(tickClock,1000); tickClock();
@@ -490,6 +494,7 @@ function finishMd(kind,id,inT,outT,r){
 }
 /* 직원 본인 근무시간 */
 function showMine(id,offset){
+  offset=0;   // 직원은 이번 페이 기간(2주)만 열람 — 과거 기록은 관리자 화면에서
   const e=S.employees[id]; if(!e) return;
   const from=addDays(periodStartFor(todayStr()),14*offset), to=addDays(from,13), today=todayStr();
   let rows='', w1=0,w2=0;
@@ -504,7 +509,7 @@ function showMine(id,offset){
   }
   rows+=`<tr class="wk"><td colspan="3">2주차 합계 <small style="font-weight:400;color:var(--muted)">(30분 단위)</small></td><td>${roundHalf(w2).toFixed(1)}h</td></tr><tr class="tot"><td colspan="3">2주 총 근무시간</td><td>${(roundHalf(w1)+roundHalf(w2)).toFixed(1)}h</td></tr>`;
   showMd(`<div class="my-md"><h2>${esc(e.name)} 근무시간</h2>
-    <div class="my-nav"><button onclick="showMine('${id}',${offset-1})">◀ 이전 2주</button><div class="pr">${from.replace(/-/g,'.')} ~ ${to.replace(/-/g,'.')}${offset===0?'<br><span class="muted">이번 페이 기간</span>':''}</div><button onclick="showMine('${id}',${offset+1})" ${offset>=0?'disabled style="opacity:.3"':''}>다음 2주 ▶</button></div>
+    <div class="my-nav" style="justify-content:center"><div class="pr">${from.replace(/-/g,'.')} ~ ${to.replace(/-/g,'.')}<br><span class="muted">이번 페이 기간</span></div></div>
     <table class="my-tbl"><thead><tr><th>날짜</th><th>출근</th><th>퇴근</th><th>근무(h)</th></tr></thead><tbody>${rows}</tbody></table>
     <p class="muted" style="text-align:center">근무시간은 점심 ${S.settings.lunchMin||0}분 차감 후이며, 주 합계는 30분 단위로 반올림합니다. 수정이 필요하면 사장님께 말씀하세요.</p>
     <button class="cancel" onclick="closeMd()">닫기</button></div>`);
