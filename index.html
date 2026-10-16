@@ -230,7 +230,7 @@ tr.open td{background:#fffbeb}
           <span class="subtabs" style="margin-left:12px"><button class="on" data-co="" onclick="setWeekCo(this)">전체</button><button data-co="ATM" onclick="setWeekCo(this)">ATM</button><button data-co="MW" onclick="setWeekCo(this)">고기마을</button></span>
           <button class="btn gray sm" style="margin-left:auto" onclick="printWeek()">🖨 인쇄</button>
         </div>
-        <p class="muted" style="margin:6px 0 0">기록이 찍힌 <b>태블릿(실제 근무 장소)</b> 기준입니다 — 소속이 달라도 그 회사에서 일한 시간은 여기에 나옵니다. 시간은 점심 차감 후, 주 합계는 30분 단위.</p>
+        <p class="muted" style="margin:6px 0 0">기록이 찍힌 <b>태블릿(실제 근무 장소)</b> 기준입니다 — 소속이 달라도 그 회사에서 일한 시간은 여기에 나옵니다. 칸의 <b>굵은 숫자 = 30분 단위</b>, 작은 숫자 = 실제 분 단위. 주 합계는 실제 분 합계를 30분 단위로 반올림(급여 계산 기준).</p>
       </div>
       <div class="card" id="weekArea"></div>
     </div>
@@ -337,7 +337,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.10.16b';
+const APP_VER = 'v2026.10.16c';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -587,13 +587,13 @@ function weekData(){
 function renderWeek(){
   const {from,to,rows}=weekData(); document.getElementById('wkFrom').value=from; document.getElementById('wkTo').textContent=to;
   const days=[...Array(7)].map((_,i)=>addDays(from,i));
-  const cell=(o,i)=>o.sat[i]?'<span style="color:var(--amber);font-weight:700">일당</span>':o.open[i]?'<span class="warn-txt">미기록</span>':(o.d[i]?o.d[i].toFixed(2):(o.lv[i]?'<span style="color:var(--amber);font-size:12px">'+o.lv[i]+'</span>':''));
+  const cell=(o,i)=>o.sat[i]?'<span style="color:var(--amber);font-weight:700">일당</span>':o.open[i]?'<span class="warn-txt">미기록</span>':(o.d[i]?`<b>${roundHalf(o.d[i]).toFixed(1)}</b><br><small style="color:var(--gray)">${o.d[i].toFixed(2)}</small>`:(o.lv[i]?'<span style="color:var(--amber);font-size:12px">'+o.lv[i]+'</span>':''));
   const groups=weekCo?[weekCo]:['ATM','MW'];
   let html='';
   groups.forEach(co=>{ const rs=rows.filter(o=>o.site===co); if(!rs.length&&weekCo) html+=`<p class="muted">${coName(co)} 기록 없음</p>`; if(!rs.length) return;
     const sum=[0,0,0,0,0,0,0]; let tot=0; rs.forEach(o=>{ o.d.forEach((h,i)=>sum[i]+=h); tot+=roundHalf(o.tot); }); const zero=rs.filter(o=>!o.tot&&!o.sat.some(Boolean)).length;
     html+=`<h3 style="margin:${html?'18px':'0'} 0 8px"><span class="tag ${co}">${coName(co)}</span> 근무 시간표 <span class="muted" style="font-weight:400">${from.replace(/-/g,'.')} ~ ${to.replace(/-/g,'.')} · ${rs.length}명${zero?' (근무 없음 '+zero+'명)':''}</span></h3>
-      <div class="tbl-wrap"><table class="wk-tbl"><thead><tr><th>직원</th>${days.map((d,i)=>`<th style="text-align:center;${i===6?'color:var(--red)':i===5?'color:var(--blue)':''}">${d.slice(5).replace('-','/')}<br><small>${DOW[parseDate(d).getDay()]}</small></th>`).join('')}<th style="text-align:right">주 합계<br><small>30분 단위</small></th><th>비고 <small class="muted">(휴가는 자동, 그 외 직접 입력)</small></th></tr></thead><tbody>
+      <div class="tbl-wrap"><table class="wk-tbl"><thead><tr><th>직원</th>${days.map((d,i)=>`<th style="text-align:center;${i===6?'color:var(--red)':i===5?'color:var(--blue)':''}">${d.slice(5).replace('-','/')}<br><small>${DOW[parseDate(d).getDay()]}</small></th>`).join('')}<th style="text-align:right">주 합계<br><small>분 합계→30분 단위</small></th><th>비고 <small class="muted">(휴가는 자동, 그 외 직접 입력)</small></th></tr></thead><tbody>
       ${rs.map(o=>`<tr><td><b>${esc(o.name)}</b>${o.home!==o.site?' <span class="tag '+o.home+'" style="font-size:10px">'+coName(o.home)+' 소속</span>':''}</td>${o.d.map((h,i)=>`<td style="text-align:center;${i>=5?'background:#f9fafb':''}">${cell(o,i)}</td>`).join('')}<td style="text-align:right;font-weight:800;${o.tot?'':'color:var(--gray)'}">${roundHalf(o.tot).toFixed(1)}</td><td>${o.lvSum?'<span class="tag MW" style="font-size:11px">'+o.lvSum+'</span> ':''}<input type="text" value="${esc(o.note)}" placeholder="${o.tot||o.sat.some(Boolean)?'':'사유 입력 (예: 결근, 개인 사정)'}" style="width:170px;padding:3px 6px;font-size:12px" onchange="setWeekNote('${from}','${o.empId}',this.value)"></td></tr>`).join('')}
       <tr class="tot" style="background:#eff6ff;font-weight:800"><td>합계 <small style="font-weight:400;color:var(--muted)">30분 단위</small></td>${sum.map(h=>`<td style="text-align:center">${h?roundHalf(h).toFixed(1):''}</td>`).join('')}<td style="text-align:right">${tot.toFixed(1)}</td><td></td></tr></tbody></table></div>`; });
   document.getElementById('weekArea').innerHTML=html||'<p class="muted">이 주에 기록이 없습니다.</p>';
