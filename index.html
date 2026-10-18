@@ -169,7 +169,8 @@ tr.open td{background:#fffbeb}
       <div class="row" style="margin:6px 0 0;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="btn gray" onclick="backupAll()">💾 출퇴근 데이터 백업 (JSON)</button>
         <label class="btn gray" style="cursor:pointer">복원 <input type="file" accept=".json" style="display:none" onchange="restoreAll(this)"></label>
-        <span class="muted" style="font-size:11px;line-height:1.3">저장 위치: 이 기기 브라우저의 <b>다운로드</b> 폴더 — PC는 <code>C:\Users\(사용자)\Downloads</code>, 테블릿은 내 파일 › Download · 파일명 <code>출퇴근_백업_날짜.json</code></span>
+        <button class="btn gray" id="bkDirBtn" onclick="pickBackupDir()" style="font-size:12px">📁 백업 폴더 지정</button>
+        <span class="muted" style="font-size:11px;line-height:1.3" id="bkWhere">저장 위치 확인 중…</span>
       </div>
     </div>
     <div class="tabs">
@@ -332,7 +333,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.10.18a';
+const APP_VER = 'v2026.10.18b';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -559,7 +560,7 @@ function adminLogout(){ sessionStorage.removeItem('att_admin'); go('#kiosk'); }
 document.getElementById('aPw').addEventListener('keydown',e=>{if(e.key==='Enter')adminLogin();});
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('hidden',t.id!=='tab-'+b.dataset.tab));renderAdmin();});
 function curTab(){return document.querySelector('.tabs button.on').dataset.tab;}
-function renderAdmin(){ syncPeriodInputs(); const t=curTab(); ({today:renderToday,records:renderRecords,leave:renderLeave,period:renderPeriod,week:renderWeek,emps:renderEmps,settings:renderSettings})[t](); fillEmpSelects(); }
+function renderAdmin(){ bkWhereText(); syncPeriodInputs(); const t=curTab(); ({today:renderToday,records:renderRecords,leave:renderLeave,period:renderPeriod,week:renderWeek,emps:renderEmps,settings:renderSettings})[t](); fillEmpSelects(); }
 /* ---------- 주간 시간표 (실제 근무 장소 기준) ---------- */
 let curWeek=null, weekCo='';
 function mondayOfDate(d){ const x=parseDate(d); const k=(x.getDay()+6)%7; return addDays(d,-k); }
@@ -738,7 +739,7 @@ function delEmp(id){ if(!confirm(`${empName(id)} 직원을 삭제할까요? (기
 function moveEmp(id,dir){ const emps=sortedEmps(false); const i=emps.findIndex(e=>e.id===id); const j=i+dir; if(j<0||j>=emps.length)return; [emps[i],emps[j]]=[emps[j],emps[i]]; emps.forEach((e,k)=>{ if(e.order!==k) dbWrite(`employees/${e.id}/order`,k); }); }
 
 /* 설정 */
-function renderSettings(){
+function renderSettings(){ bkWhereText();
   const s=S.settings; document.getElementById('sKioskCo').value=kioskCo(); document.getElementById('sLunch').value=s.lunchMin??30; document.getElementById('sLunchMin').value=s.lunchMinHours??5; document.getElementById('sAuto').value=s.autoClose??6; document.getElementById('sAnchor').value=s.periodAnchor||PERIOD_ANCHOR;
   document.getElementById('sFbState').textContent=FIREBASE_CONFIG?'(파일에 내장됨)':(LS.get('att_fb',null)?'(이 기기에 저장됨)':'(미설정 · 로컬 모드)');
   document.getElementById('sFb').value=FIREBASE_CONFIG?'':(LS.get('att_fb',null)?JSON.stringify(LS.get('att_fb'),null,2):'');
@@ -767,7 +768,21 @@ function resetAll(){
   if(db){ ref('records').remove(); ref('leaves').remove(); }
   S.records={}; S.leaves={}; LS.set('att_cache',S); rerender(); toast('전체 기록 삭제 완료 — 직원·설정 유지');
 }
-function backupAll(){ download(`출퇴근_백업_${todayStr()}.json`,JSON.stringify(S,null,2),'application/json'); }
+/* 백업 폴더: PC Chrome/Edge는 File System Access API로 지정 폴더(예: OneDrive\문서\WAGE\직원관리)에 직접 저장. 지원 안 되는 기기(테블릿)는 다운로드 폴더 */
+const BK_DIR_PATH='C:\\Users\\BM Kim\\OneDrive\\문서\\WAGE\\직원관리';
+function bkIdb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('att_bk',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function bkGet(k){ try{ const d=await bkIdb(); return await new Promise((res,rej)=>{ const t=d.transaction('kv').objectStore('kv').get(k); t.onsuccess=()=>res(t.result); t.onerror=()=>rej(t.error); }); }catch(e){ return null; } }
+async function bkSet(k,v){ try{ const d=await bkIdb(); await new Promise((res,rej)=>{ const t=d.transaction('kv','readwrite').objectStore('kv').put(v,k); t.onsuccess=res; t.onerror=()=>rej(t.error); }); }catch(e){} }
+async function bkWhereText(){ const el=document.getElementById('bkWhere'); if(!el) return; const btn=document.getElementById('bkDirBtn');
+  if(!window.showDirectoryPicker){ if(btn) btn.style.display='none'; el.innerHTML='이 기기는 <b>다운로드</b> 폴더에 저장됩니다 (테블릿: 내 파일 › Download). PC Chrome에서는 지정 폴더로 바로 저장할 수 있습니다.'; return; }
+  const h=await bkGet('dir'); el.innerHTML=h?`저장 위치: <b>${h.name}</b> 폴더 <code style="font-size:10px">${BK_DIR_PATH}</code> · 파일명 <code>출퇴근_백업_날짜.json</code>`:`폴더 미지정 → 다운로드 폴더. [📁 백업 폴더 지정]에서 <code style="font-size:10px">${BK_DIR_PATH}</code> 선택`; }
+async function pickBackupDir(){ try{ const h=await window.showDirectoryPicker({id:'attbk',mode:'readwrite',startIn:'documents'}); await bkSet('dir',h); toast('백업 폴더 지정됨: '+h.name); bkWhereText(); }catch(e){ if(e.name!=='AbortError') toast('폴더 지정 실패: '+e.message); } }
+async function backupAll(){ const name=`출퇴근_백업_${todayStr()}.json`, data=JSON.stringify(S,null,2);
+  if(window.showDirectoryPicker){ let h=await bkGet('dir');
+    if(h){ try{ let perm=await h.queryPermission({mode:'readwrite'}); if(perm!=='granted') perm=await h.requestPermission({mode:'readwrite'});
+        if(perm==='granted'){ const f=await h.getFileHandle(name,{create:true}); const w=await f.createWritable(); await w.write(data); await w.close(); toast('백업 저장됨: '+h.name+'\\\\'+name); return; } }
+      catch(e){ console.warn('dir save fail',e); toast('지정 폴더 저장 실패 — 다운로드로 대신 저장'); } } }
+  download(name,data,'application/json'); }
 function restoreAll(inp){ const f=inp.files[0]; if(!f)return; const rd=new FileReader(); rd.onload=()=>{ try{ const v=JSON.parse(rd.result); if(!v.employees||!v.records) throw 0; if(!confirm('현재 데이터를 백업 파일로 덮어씁니다. 계속할까요?'))return; if(db) ref().set(v); S=v; LS.set('att_cache',S); rerender(); toast('복원 완료'); }catch(e){toast('올바른 백업 파일이 아닙니다');} }; rd.readAsText(f); inp.value=''; }
 
 /* ---------- boot ---------- */
