@@ -166,6 +166,11 @@ tr.open td{background:#fffbeb}
         <button class="btn gray" onclick="go('#kiosk')">출퇴근 화면</button>
         <button class="btn gray" onclick="adminLogout()">로그아웃</button>
       </div>
+      <div class="row" style="margin:6px 0 0;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn gray" onclick="backupAll()">💾 출퇴근 데이터 백업 (JSON)</button>
+        <label class="btn gray" style="cursor:pointer">복원 <input type="file" accept=".json" style="display:none" onchange="restoreAll(this)"></label>
+        <span class="muted" style="font-size:11px;line-height:1.3">저장 위치: 이 기기 브라우저의 <b>다운로드</b> 폴더 — PC는 <code>C:\Users\(사용자)\Downloads</code>, 테블릿은 내 파일 › Download · 파일명 <code>출퇴근_백업_날짜.json</code></span>
+      </div>
     </div>
     <div class="tabs">
       <button data-tab="today" class="on">오늘 현황</button>
@@ -295,16 +300,6 @@ tr.open td{background:#fffbeb}
         <textarea id="sFb" rows="8" style="width:100%;font-family:monospace;font-size:13px" placeholder='{ "apiKey": "...", "authDomain": "...", "databaseURL": "...", "projectId": "...", ... }'></textarea>
         <div class="row" style="margin-top:8px"><button class="btn" onclick="saveFb()">저장 후 새로고침</button><button class="btn gray" onclick="clearFb()">이 기기 설정 지우기</button></div>
       </div>
-      <div class="card" style="border:1px solid #fca5a5">
-        <h3 style="color:#b91c1c">테스트 기록 초기화</h3>
-        <p class="muted">실제 운영 전 테스트로 올린 출퇴근·휴가 기록을 지웁니다. <b>직원 목록·설정·비밀번호는 그대로</b> 유지됩니다. 지우기 전에 백업 JSON이 자동으로 다운로드됩니다.</p>
-        <div class="row"><label>기간 삭제</label><input type="date" id="sDelFrom"> ~ <input type="date" id="sDelTo"> <button class="btn gray" onclick="resetRange()">이 기간 기록만 삭제</button></div>
-        <div class="row" style="margin-top:8px"><button class="btn" style="background:#b91c1c" onclick="resetAll()">출퇴근·휴가 기록 전체 삭제</button></div>
-      </div>
-      <div class="card">
-        <h3>출퇴근 데이터 백업</h3>
-        <div class="row"><button class="btn gray" onclick="backupAll()">전체 기록 JSON 다운로드</button><label class="btn gray" style="cursor:pointer">복원(JSON) <input type="file" accept=".json" style="display:none" onchange="restoreAll(this)"></label></div>
-      </div>
     </div>
   </div>
 </div>
@@ -337,7 +332,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.10.17d';
+const APP_VER = 'v2026.10.18a';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -748,7 +743,9 @@ function renderSettings(){
   document.getElementById('sFbState').textContent=FIREBASE_CONFIG?'(파일에 내장됨)':(LS.get('att_fb',null)?'(이 기기에 저장됨)':'(미설정 · 로컬 모드)');
   document.getElementById('sFb').value=FIREBASE_CONFIG?'':(LS.get('att_fb',null)?JSON.stringify(LS.get('att_fb'),null,2):'');
 }
-function saveRules(){ dbWrite('settings/lunchMin',Number(document.getElementById('sLunch').value)); dbWrite('settings/lunchMinHours',Number(document.getElementById('sLunchMin').value)); dbWrite('settings/autoClose',Number(document.getElementById('sAuto').value)); const an=document.getElementById('sAnchor').value; if(an) dbWrite('settings/periodAnchor',mondayOf(an)); curPeriod=null; toast('규칙 저장됨'); }
+function saveRules(){ /* 값을 먼저 전부 읽고 저장 — dbWrite가 화면을 다시 그려 입력값이 되돌아가던 문제 수정 */
+  const lunch=Number(document.getElementById('sLunch').value), lunchMin=Number(document.getElementById('sLunchMin').value), auto=Number(document.getElementById('sAuto').value), an=document.getElementById('sAnchor').value;
+  dbWrite('settings/lunchMin',lunch); dbWrite('settings/lunchMinHours',lunchMin); dbWrite('settings/autoClose',auto); if(an) dbWrite('settings/periodAnchor',mondayOf(an)); curPeriod=null; renderSettings(); toast('규칙 저장됨'); }
 function changePw(){ const a=document.getElementById('sPw1').value,b=document.getElementById('sPw2').value; if(!a||a!==b){toast('비밀번호가 일치하지 않습니다');return;} dbWrite('settings/adminPw',a); document.getElementById('sPw1').value=document.getElementById('sPw2').value=''; toast('비밀번호 변경됨'); }
 function saveFb(){ let t=document.getElementById('sFb').value.trim(); if(!t){toast('설정을 붙여넣으세요');return;} try{ t=t.replace(/^\s*(const|var|let)\s+\w+\s*=\s*/,'').replace(/;\s*$/,''); const cfg=(new Function('return ('+t+')'))(); if(!cfg.databaseURL) throw new Error('databaseURL 없음'); LS.set('att_fb',cfg); location.reload(); }catch(e){toast('형식 오류: '+e.message);} }
 function clearFb(){ localStorage.removeItem('att_fb'); location.reload(); }
