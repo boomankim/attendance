@@ -91,7 +91,7 @@ input,select,textarea{font-family:inherit;font-size:16px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .tabs button{padding:10px 16px;border-radius:10px;background:#e5e7eb;font-weight:700;font-size:15px}
 .tabs button.on{background:var(--blue);color:#fff}
-.wk-tbl{width:100%;border-collapse:collapse;font-size:14px}.wk-tbl th,.wk-tbl td{padding:7px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap}.wk-tbl th{background:#f3f4f6;font-size:12.5px}
+.wk-tbl{width:100%;border-collapse:collapse;font-size:14px}.wk-tbl th,.wk-tbl td{padding:3px 8px;border-bottom:1px solid #e5e7eb;white-space:nowrap;line-height:1.25}.wk-tbl td small{font-size:11px}.wk-tbl th{background:#f3f4f6;font-size:12.5px}
 @page{margin:12mm}
 @media print{ body.print-week *{visibility:hidden} body.print-week #weekArea,body.print-week #weekArea *{visibility:visible} body.print-week #weekArea{position:absolute;top:0;left:0;width:100%;box-shadow:none;border:0} }
 .subtabs{display:flex;gap:4px}.subtabs button{padding:6px 12px;border-radius:8px;background:#e5e7eb;font-weight:700;font-size:13px}.subtabs button.on{background:var(--blue);color:#fff}
@@ -333,7 +333,7 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.10.23a';
+const APP_VER = 'v2026.10.30a';
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -452,7 +452,7 @@ setInterval(tickClock,1000); tickClock();
 
 function renderKiosk(){
   applyBrand(); const g=document.getElementById('kGrid'); const co=kioskCo(); const emps=sortedEmps(true).filter(e=>e.company===co||e.sites==='BOTH'); const today=todayStr(); let inCount=0;
-  if(!emps.length){ g.innerHTML='<div class="k-empty">${coName(kioskCo())} 직원이 없습니다.<br>관리자 → 직원 관리에서 추가하거나, 설정에서 이 기기의 회사를 확인하세요.</div>'; document.getElementById('kInCount').textContent=''; return; }
+  if(!emps.length){ g.innerHTML='<div class="k-empty">'+coName(kioskCo())+' 직원이 없습니다.<br>관리자 → 직원 관리에서 추가하거나, 설정에서 이 기기의 회사를 확인하세요.</div>'; document.getElementById('kInCount').textContent=''; return; }
   g.innerHTML=emps.map(e=>{
     const o=openRec(e.id); let cls='',st='출근 전'; const lv=leaveOn(today,e.id);
     if(lv){cls='off';st='휴가중 ~'+lv.end.slice(5).replace('-','/');}
@@ -583,7 +583,7 @@ function weekData(){
 function renderWeek(){
   const {from,to,rows}=weekData(); document.getElementById('wkFrom').value=from; document.getElementById('wkTo').textContent=to;
   const days=[...Array(7)].map((_,i)=>addDays(from,i));
-  const cell=(o,i)=>o.sat[i]?'<span style="color:var(--amber);font-weight:700">일당</span>':o.open[i]?'<span class="warn-txt">미기록</span>':(o.d[i]?`<b>${roundHalf(o.d[i]).toFixed(1)}</b><br><small style="color:var(--gray)">${o.d[i].toFixed(2)}</small>`:(o.lv[i]?'<span style="color:var(--amber);font-size:12px">'+o.lv[i]+'</span>':''));
+  const cell=(o,i)=>o.sat[i]?'<span style="color:var(--amber);font-weight:700">일당</span>':o.open[i]?'<span class="warn-txt">미기록</span>':(o.d[i]?`<b>${roundHalf(o.d[i]).toFixed(1)}</b> <small style="color:var(--gray)">${o.d[i].toFixed(2)}</small>`:(o.lv[i]?'<span style="color:var(--amber);font-size:12px">'+o.lv[i]+'</span>':''));
   const groups=weekCo?[weekCo]:['ATM','MW'];
   let html='';
   groups.forEach(co=>{ const rs=rows.filter(o=>o.site===co); if(!rs.length&&weekCo) html+=`<p class="muted">${coName(co)} 기록 없음</p>`; if(!rs.length) return;
@@ -631,7 +631,7 @@ function renderRecords(){
 /* 고기마을 수동 입력 그리드 */
 function renderManual(){
   const [from]=periodRange(); const emps=sortedEmps(true,'MW');
-  if(!emps.length){ document.getElementById('mGrid').innerHTML='<p class="muted">고기마을 직원이 없습니다. 직원 관리에서 회사를 "고기마을"로 추가하세요.</p>'; return; }
+  if(!emps.length){ document.getElementById('mGrid').innerHTML='<p class="muted">BMK 직원이 없습니다. 직원 관리에서 회사를 "BMK"로 추가하세요.</p>'; return; }
   let head='<tr><th>직원</th>'; for(let i=0;i<14;i++){ const d=addDays(from,i); const dow=parseDate(d).getDay(); head+=`<th style="text-align:center;${dow===0?'color:var(--red)':dow===6?'color:var(--blue)':''}">${d.slice(5).replace('-','/')}<br>${DOW[dow]}</th>`; if(i===6) head+='<th class="num">1주</th>'; } head+='<th class="num">2주</th><th class="num">합계</th></tr>';
   let body=emps.map(e=>{ let w1=0,w2=0,tds=''; for(let i=0;i<14;i++){ const d=addDays(from,i); const dow=parseDate(d).getDay(); const {h}=hoursOn(d,e.id); if(i<7)w1+=h; else w2+=h; tds+=`<td style="text-align:center"><input type="number" class="grid-in ${dow===6?'sat':dow===0?'sun':''}" step="0.25" min="0" value="${h||''}" onchange="setManual('${d}','${e.id}',this.value)"></td>`; if(i===6) tds+=`<td class="num"><b>${w1.toFixed(2)}</b></td>`; } return `<tr><td><b>${esc(e.name)}</b></td>${tds}<td class="num"><b>${w2.toFixed(2)}</b></td><td class="num"><b>${(w1+w2).toFixed(2)}</b></td></tr>`; }).join('');
   document.getElementById('mGrid').innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
