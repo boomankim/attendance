@@ -133,6 +133,7 @@ tr.open td{background:#fffbeb}
 .sheet td.cash{color:var(--green);font-weight:700}.sheet td.tax{color:var(--blue);font-weight:700}
 .sheet td.we{background:#fafafa}
 @media (max-width:600px){.k-head .clock .time{font-size:30px}.emp .nm{font-size:20px}.k-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
+.tsel select{font-size:18px;padding:6px 8px;border:1px solid #d1d5db;border-radius:8px;background:#fff}.tsel{display:inline-flex;align-items:center;gap:4px;font-weight:700}
 </style>
 </head>
 <body>
@@ -312,8 +313,8 @@ tr.open td{background:#fffbeb}
     <div class="row"><label style="width:60px">직원</label><select id="edEmp"></select></div>
     <div class="row"><label style="width:60px">날짜</label><input type="date" id="edDate"></div>
     <div id="edClock">
-      <div class="row"><label style="width:60px">출근</label><input type="time" id="edIn"></div>
-      <div class="row"><label style="width:60px">퇴근</label><input type="time" id="edOut"> <span class="muted">(비우면 미기록)</span></div>
+      <div class="row"><label style="width:60px">출근</label><span class="tsel"><select id="edInH"></select>:<select id="edInM"></select></span> <span class="muted">24시간제</span></div>
+      <div class="row"><label style="width:60px">퇴근</label><span class="tsel"><select id="edOutH"></select>:<select id="edOutM"></select></span> <span class="muted">(시를 "--"로 두면 미기록)</span></div>
       <div class="row"><label style="width:60px">휴게</label><input type="number" id="edBreak" min="0" style="width:80px"> 분 <label><input type="checkbox" id="edBreakAuto" checked> 자동(규칙 적용)</label></div>
     </div>
     <div class="row"><label style="width:60px">메모</label><input type="text" id="edNote" style="flex:1"></div>
@@ -333,7 +334,14 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.10.30a';
+const APP_VER = 'v2026.11.06a';
+/* 24시간제 시:분 선택 (브라우저 time 입력의 오전/오후 표기 대신) */
+function tInit(id,allowEmpty){ const h=document.getElementById(id+'H'), m=document.getElementById(id+'M'); if(!h||h.options.length) return;
+  h.innerHTML=(allowEmpty?'<option value="">--</option>':'')+[...Array(24)].map((_,i)=>`<option value="${String(i).padStart(2,'0')}">${String(i).padStart(2,'0')}</option>`).join('');
+  m.innerHTML=[...Array(60)].map((_,i)=>`<option value="${String(i).padStart(2,'0')}">${String(i).padStart(2,'0')}</option>`).join(''); }
+function tSet(id,v){ tInit('edIn',false); tInit('edOut',true); const h=document.getElementById(id+'H'), m=document.getElementById(id+'M'); const mm=/^(\d{1,2}):(\d{2})/.exec(v||'');
+  if(mm){ h.value=String(+mm[1]).padStart(2,'0'); m.value=mm[2]; } else { h.value=id==='edOut'?'':'06'; m.value='00'; } }
+function tGet(id){ const h=document.getElementById(id+'H').value, m=document.getElementById(id+'M').value; return h===''?'':h+':'+(m||'00'); }
 let PERIOD_ANCHOR = '2026-08-17'; // 페이 기간 시작 월요일 기준일 — 설정에서 변경 가능
 
 /* ---------- state ---------- */
@@ -706,8 +714,7 @@ function openEdit(date,id){
   document.getElementById('edDel').classList.toggle('hidden',!r);
   document.getElementById('edEmp').value=r?r.empId:(sortedEmps(true)[0]?.id||'');
   document.getElementById('edDate').value=r?date:todayStr();
-  document.getElementById('edIn').value=r?(r.in||''):'';
-  document.getElementById('edOut').value=r?(r.out||''):'';
+  tSet('edIn',r?(r.in||''):''); tSet('edOut',r?(r.out||''):'');
   document.getElementById('edBreakAuto').checked=r?r.breakAuto!==false:true;
   document.getElementById('edBreak').value=r?calcBreak(r):S.settings.lunchMin; document.getElementById('edBreak').disabled=document.getElementById('edBreakAuto').checked;
   document.getElementById('edNote').value=r?(r.note||''):'';
@@ -716,7 +723,7 @@ function openEdit(date,id){
 document.getElementById('edBreakAuto').onchange=e=>{document.getElementById('edBreak').disabled=e.target.checked;};
 function closeEdit(){document.getElementById('editOv').classList.add('hidden');}
 function saveEdit(){
-  const empId=document.getElementById('edEmp').value, date=document.getElementById('edDate').value, inT=document.getElementById('edIn').value, outT=document.getElementById('edOut').value||null;
+  const empId=document.getElementById('edEmp').value, date=document.getElementById('edDate').value, inT=tGet('edIn'), outT=tGet('edOut')||null;
   const old=ed.date?S.records[ed.date][ed.id]:{};
   if(old.hours!=null){ dbWrite(`records/${ed.date}/${ed.id}`,{...old,note:document.getElementById('edNote').value}); closeEdit(); return; }
   if(!empId||!date||!inT){toast('직원·날짜·출근시간은 필수입니다');return;}
