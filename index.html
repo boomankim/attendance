@@ -334,9 +334,9 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.11.08a';
+const APP_VER = 'v2026.11.08b';
 /* 시간 표기: 소수점 시간 → '9시간 58분' (계산은 그대로 소수점) */
-function hm(h){ h=+h||0; if(!h) return ''; const sign=h<0?'−':''; h=Math.abs(h); let H=Math.floor(h), M=Math.round((h-H)*60); if(M===60){H++;M=0;} return sign+(H?H+'시간':'')+(M?(H?' ':'')+M+'분':(H?'':'0분')); }
+function hm(h){ h=+h||0; if(!h) return ''; const sign=h<0?'−':''; h=Math.abs(h); let H=Math.floor(h), M=Math.round((h-H)*60); if(M===60){H++;M=0;} return sign+H+':'+String(M).padStart(2,'0'); }   /* 11.28h → 11:17 */
 /* 24시간제 시:분 선택 (브라우저 time 입력의 오전/오후 표기 대신) */
 function tInit(id,allowEmpty){ const h=document.getElementById(id+'H'), m=document.getElementById(id+'M'); if(!h||h.options.length) return;
   h.innerHTML=(allowEmpty?'<option value="">--</option>':'')+[...Array(24)].map((_,i)=>`<option value="${String(i).padStart(2,'0')}">${String(i).padStart(2,'0')}</option>`).join('');
@@ -622,7 +622,7 @@ function setTodayCo(btn){ todayCo=btn.dataset.co; btn.parentElement.querySelecto
 function renderToday(){
   const d=todayStr(); document.getElementById('tDate').textContent=d+(todayCo?' · '+coName(todayCo):'');
   const rs=recsBetween(d,d).filter(r=>r.hours==null&&(!todayCo||empCo(r.empId)===todayCo)); const working=rs.filter(r=>!r.out&&!r.satFlat).length; const done=rs.filter(r=>r.out||r.satFlat).length; const hrs=rs.reduce((a,r)=>a+(calcHours(r)||0),0);
-  document.getElementById('tKpi').innerHTML=`<div><b>${working}</b><span>현재 근무중</span></div><div><b>${done}</b><span>퇴근 완료</span></div><div><b>${hm(hrs)||'0분'}</b><span>오늘 근무시간 합계</span></div><div><b>${sortedEmps(true,todayCo||null).length}</b><span>${todayCo?coName(todayCo):'전체'} 직원</span></div>${(n=>n?`<div style="background:#fffbeb"><b style="color:var(--amber)">${n}</b><span>휴가 신청 대기</span></div>`:'')(Object.values(S.leaves||{}).filter(l=>l.status==='req').length)}`;
+  document.getElementById('tKpi').innerHTML=`<div><b>${working}</b><span>현재 근무중</span></div><div><b>${done}</b><span>퇴근 완료</span></div><div><b>${hm(hrs)||'0:00'}</b><span>오늘 근무시간 합계</span></div><div><b>${sortedEmps(true,todayCo||null).length}</b><span>${todayCo?coName(todayCo):'전체'} 직원</span></div>${(n=>n?`<div style="background:#fffbeb"><b style="color:var(--amber)">${n}</b><span>휴가 신청 대기</span></div>`:'')(Object.values(S.leaves||{}).filter(l=>l.status==='req').length)}`;
   document.getElementById('tBody').innerHTML=rs.length?rs.map(r=>rowHtml(r,false)).join(''):'<tr><td colspan="7" class="muted">오늘 기록 없음</td></tr>';
   const opens=recsBetween('0000','9999').filter(r=>r.hours==null&&!r.out&&!r.satFlat&&r.date<d&&(!todayCo||empCo(r.empId)===todayCo));
   document.getElementById('tOpenCard').classList.toggle('hidden',!opens.length);
@@ -636,7 +636,7 @@ function renderRecords(){
   const rs=recsBetween(f.value,t.value,document.getElementById('rEmp').value||null).filter(r=>!recCo||empCo(r.empId)===recCo).reverse();   /* 최근 기록이 위로 */
   document.getElementById('rBody').innerHTML=rs.length?rs.map(r=>rowHtml(r,true)).join(''):'<tr><td colspan="9" class="muted">기록 없음</td></tr>';
   const tot=rs.reduce((a,r)=>a+(calcHours(r)||0),0);
-  document.getElementById('rSum').textContent=`${rs.length}건 · 합계 ${hm(tot)||'0분'} · 휴게 뒤 * 표시 = 수동 입력`;
+  document.getElementById('rSum').textContent=`${rs.length}건 · 합계 ${hm(tot)||'0:00'} · 휴게 뒤 * 표시 = 수동 입력`;
 }
 /* 고기마을 수동 입력 그리드 */
 function renderManual(){
