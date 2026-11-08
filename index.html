@@ -334,7 +334,9 @@ tr.open td{background:#fffbeb}
 const FIREBASE_CONFIG = { apiKey:"AIzaSyCsrsbrCeWyc9AU5en8vP9NkSwYN3xwNAA", databaseURL:"https://atm-order-system-default-rtdb.asia-southeast1.firebasedatabase.app", projectId:"atm-order-system", storageBucket:"atm-order-system.firebasestorage.app", messagingSenderId:"356675041494", appId:"1:356675041494:web:cb492963627ec620d3f177" }; // 예: { apiKey:"...", authDomain:"...", databaseURL:"...", projectId:"...", storageBucket:"...", messagingSenderId:"...", appId:"..." }
 const DB_ROOT = 'attendance_db';
 const DEFAULT_PW = '1234';
-const APP_VER = 'v2026.11.06a';
+const APP_VER = 'v2026.11.08a';
+/* 시간 표기: 소수점 시간 → '9시간 58분' (계산은 그대로 소수점) */
+function hm(h){ h=+h||0; if(!h) return ''; const sign=h<0?'−':''; h=Math.abs(h); let H=Math.floor(h), M=Math.round((h-H)*60); if(M===60){H++;M=0;} return sign+(H?H+'시간':'')+(M?(H?' ':'')+M+'분':(H?'':'0분')); }
 /* 24시간제 시:분 선택 (브라우저 time 입력의 오전/오후 표기 대신) */
 function tInit(id,allowEmpty){ const h=document.getElementById(id+'H'), m=document.getElementById(id+'M'); if(!h||h.options.length) return;
   h.innerHTML=(allowEmpty?'<option value="">--</option>':'')+[...Array(24)].map((_,i)=>`<option value="${String(i).padStart(2,'0')}">${String(i).padStart(2,'0')}</option>`).join('');
@@ -526,10 +528,10 @@ function showMine(id,offset){
     const {h,open}=hoursOn(d,id); const hh=roundHalf(h); if(i<7) w1+=hh; else w2+=hh;
     const cls=(dow===6?'sat':dow===0?'sun':'');
     const inT=(rs[0]?rs[0].in+(rs[0].satFlat?' <small style="color:var(--amber)">일당</small>':''):'')+((rs[0]&&rs[0].site&&rs[0].site!==e.company)?' <small style="color:var(--mw)">'+coName(rs[0].site)+'</small>':''), outT=rs.length?(rs[rs.length-1].satFlat?'—':(rs[rs.length-1].out||'<span class="warn-txt">미기록</span>')):''; const lv=leaveOn(d,id);
-    rows+=`<tr class="${cls}"><td>${d.slice(5).replace('-','/')} (${DOW[dow]})${d===today?' ●':''}</td>`+(lv&&!rs.length?`<td colspan="3" style="color:var(--amber);font-weight:700">${LTYPE[lv.type]||'휴가'}</td></tr>`:`<td class="${inT?'':'dim'}">${inT||'-'}</td><td class="${rs.length?'':'dim'}">${outT||'-'}</td><td class="${rs.length?'':'dim'}">${rs.length?(open&&!h?'-':`<b>${roundHalf(h).toFixed(1)}</b> <small style="color:var(--gray)">${h.toFixed(2)}</small>`):'-'}</td></tr>`);
-    if(i===6) rows+=`<tr class="wk"><td colspan="3">1주차 합계 <small style="font-weight:400;color:var(--muted)">(일별 30분 단위)</small></td><td>${w1.toFixed(1)}h</td></tr>`;
+    rows+=`<tr class="${cls}"><td>${d.slice(5).replace('-','/')} (${DOW[dow]})${d===today?' ●':''}</td>`+(lv&&!rs.length?`<td colspan="3" style="color:var(--amber);font-weight:700">${LTYPE[lv.type]||'휴가'}</td></tr>`:`<td class="${inT?'':'dim'}">${inT||'-'}</td><td class="${rs.length?'':'dim'}">${outT||'-'}</td><td class="${rs.length?'':'dim'}">${rs.length?(open&&!h?'-':`<b>${hm(roundHalf(h))}</b> <small style="color:var(--gray)">${hm(h)}</small>`):'-'}</td></tr>`);
+    if(i===6) rows+=`<tr class="wk"><td colspan="3">1주차 합계 <small style="font-weight:400;color:var(--muted)">(일별 30분 단위)</small></td><td>${(hm(w1))}</td></tr>`;
   }
-  rows+=`<tr class="wk"><td colspan="3">2주차 합계 <small style="font-weight:400;color:var(--muted)">(일별 30분 단위)</small></td><td>${w2.toFixed(1)}h</td></tr><tr class="tot"><td colspan="3">2주 총 근무시간</td><td>${(w1+w2).toFixed(1)}h</td></tr>`;
+  rows+=`<tr class="wk"><td colspan="3">2주차 합계 <small style="font-weight:400;color:var(--muted)">(일별 30분 단위)</small></td><td>${(hm(w2))}</td></tr><tr class="tot"><td colspan="3">2주 총 근무시간</td><td>${(hm(w1+w2))}</td></tr>`;
   showMd(`<div class="my-md"><h2>${esc(e.name)} 근무시간</h2>
     <div class="my-nav" style="justify-content:center"><div class="pr">${from.replace(/-/g,'.')} ~ ${to.replace(/-/g,'.')}<br><span class="muted">이번 페이 기간</span></div></div>
     <table class="my-tbl"><thead><tr><th>날짜</th><th>출근</th><th>퇴근</th><th>근무(h)</th></tr></thead><tbody>${rows}</tbody></table>
@@ -591,7 +593,7 @@ function weekData(){
 function renderWeek(){
   const {from,to,rows}=weekData(); document.getElementById('wkFrom').value=from; document.getElementById('wkTo').textContent=to;
   const days=[...Array(7)].map((_,i)=>addDays(from,i));
-  const cell=(o,i)=>o.sat[i]?'<span style="color:var(--amber);font-weight:700">일당</span>':o.open[i]?'<span class="warn-txt">미기록</span>':(o.d[i]?`<b>${roundHalf(o.d[i]).toFixed(1)}</b> <small style="color:var(--gray)">${o.d[i].toFixed(2)}</small>`:(o.lv[i]?'<span style="color:var(--amber);font-size:12px">'+o.lv[i]+'</span>':''));
+  const cell=(o,i)=>o.sat[i]?'<span style="color:var(--amber);font-weight:700">일당</span>':o.open[i]?'<span class="warn-txt">미기록</span>':(o.d[i]?`<b>${hm(roundHalf(o.d[i]))}</b> <small style="color:var(--gray)">${hm(o.d[i])}</small>`:(o.lv[i]?'<span style="color:var(--amber);font-size:12px">'+o.lv[i]+'</span>':''));
   const groups=weekCo?[weekCo]:['ATM','MW'];
   let html='';
   groups.forEach(co=>{ const rs=rows.filter(o=>o.site===co); if(!rs.length&&weekCo) html+=`<p class="muted">${coName(co)} 기록 없음</p>`; if(!rs.length) return;
@@ -599,8 +601,8 @@ function renderWeek(){
     const sum=[0,0,0,0,0,0,0]; let tot=0; rs.forEach(o=>{ o.dh=o.d.map(h=>roundHalf(h)); o.totHalf=o.dh.reduce((a,b)=>a+b,0); o.dh.forEach((h,i)=>sum[i]+=h); tot+=o.totHalf; }); const zero=rs.filter(o=>!o.tot&&!o.sat.some(Boolean)).length;
     html+=`<h3 style="margin:${html?'18px':'0'} 0 8px"><span class="tag ${co}">${coName(co)}</span> 근무 시간표 <span class="muted" style="font-weight:400">${from.replace(/-/g,'.')} ~ ${to.replace(/-/g,'.')} · ${rs.length}명${zero?' (근무 없음 '+zero+'명)':''}</span></h3>
       <div class="tbl-wrap"><table class="wk-tbl"><thead><tr><th>직원</th>${days.map((d,i)=>`<th style="text-align:center;${i===6?'color:var(--red)':i===5?'color:var(--blue)':''}">${d.slice(5).replace('-','/')}<br><small>${DOW[parseDate(d).getDay()]}</small></th>`).join('')}<th style="text-align:right">주 합계<br><small>일별 30분 단위 합</small></th><th>비고 <small class="muted">(휴가는 자동, 그 외 직접 입력)</small></th></tr></thead><tbody>
-      ${rs.map(o=>`<tr><td><b>${esc(o.name)}</b>${o.home!==o.site?' <span class="tag '+o.home+'" style="font-size:10px">'+coName(o.home)+' 소속</span>':''}</td>${o.d.map((h,i)=>`<td style="text-align:center;${i>=5?'background:#f9fafb':''}">${cell(o,i)}</td>`).join('')}<td style="text-align:right;font-weight:800;${o.tot?'':'color:var(--gray)'}">${o.totHalf.toFixed(1)}</td><td>${o.lvSum?'<span class="tag MW" style="font-size:11px">'+o.lvSum+'</span> ':''}<input type="text" value="${esc(o.note)}" placeholder="${o.tot||o.sat.some(Boolean)?'':'사유 입력 (예: 결근, 개인 사정)'}" style="width:170px;padding:3px 6px;font-size:12px" onchange="setWeekNote('${from}','${o.empId}',this.value)"></td></tr>`).join('')}
-      <tr class="tot" style="background:#eff6ff;font-weight:800"><td>합계 <small style="font-weight:400;color:var(--muted)">30분 단위</small></td>${sum.map(h=>`<td style="text-align:center">${h?h.toFixed(1):''}</td>`).join('')}<td style="text-align:right">${tot.toFixed(1)}</td><td></td></tr></tbody></table></div>`; });
+      ${rs.map(o=>`<tr><td><b>${esc(o.name)}</b>${o.home!==o.site?' <span class="tag '+o.home+'" style="font-size:10px">'+coName(o.home)+' 소속</span>':''}</td>${o.d.map((h,i)=>`<td style="text-align:center;${i>=5?'background:#f9fafb':''}">${cell(o,i)}</td>`).join('')}<td style="text-align:right;font-weight:800;${o.tot?'':'color:var(--gray)'}">${hm(o.totHalf)}</td><td>${o.lvSum?'<span class="tag MW" style="font-size:11px">'+o.lvSum+'</span> ':''}<input type="text" value="${esc(o.note)}" placeholder="${o.tot||o.sat.some(Boolean)?'':'사유 입력 (예: 결근, 개인 사정)'}" style="width:170px;padding:3px 6px;font-size:12px" onchange="setWeekNote('${from}','${o.empId}',this.value)"></td></tr>`).join('')}
+      <tr class="tot" style="background:#eff6ff;font-weight:800"><td>합계 <small style="font-weight:400;color:var(--muted)">30분 단위</small></td>${sum.map(h=>`<td style="text-align:center">${hm(h)}</td>`).join('')}<td style="text-align:right">${hm(tot)}</td><td></td></tr></tbody></table></div>`; });
   document.getElementById('weekArea').innerHTML=html||'<p class="muted">이 주에 기록이 없습니다.</p>';
 }
 function setWeekNote(from,empId,v){ dbWrite('weekNotes/'+from+'_'+empId,v.trim()||null); }
@@ -613,14 +615,14 @@ function fillEmpSelects(){
 }
 function rowHtml(r,showDate){
   const h=calcHours(r); const b=calcBreak(r); const manual=r.hours!=null;
-  return `<tr class="${(!manual&&!r.out&&!r.satFlat)?'open':''}">${showDate?`<td>${r.date} (${DOW[parseDate(r.date).getDay()]})</td>`:''}<td>${esc(empName(r.empId))}</td><td><span class="tag ${empCo(r.empId)}">${coName(empCo(r.empId))}</span></td><td>${manual?'<span class="muted">수동입력</span>':r.in}${(r.site&&r.site!==empCo(r.empId))?' <span class="tag MW" style="font-size:10px">'+coName(r.site)+'</span>':''}</td><td>${manual?'':(r.satFlat?'<span class="muted">일당(퇴근 없음)</span>':(r.out||'<span class="warn-txt">미기록</span>'))}</td><td class="num">${manual?'':b+(r.breakAuto===false?'*':'')}</td><td class="num">${h==null?'-':h.toFixed(2)}</td>${showDate?`<td class="muted">${esc(r.note||'')}${r.edited?' ✎':''}</td>`:''}<td><button class="btn gray sm" onclick="openEdit('${r.date}','${r.id}')">수정</button></td></tr>`;
+  return `<tr class="${(!manual&&!r.out&&!r.satFlat)?'open':''}">${showDate?`<td>${r.date} (${DOW[parseDate(r.date).getDay()]})</td>`:''}<td>${esc(empName(r.empId))}</td><td><span class="tag ${empCo(r.empId)}">${coName(empCo(r.empId))}</span></td><td>${manual?'<span class="muted">수동입력</span>':r.in}${(r.site&&r.site!==empCo(r.empId))?' <span class="tag MW" style="font-size:10px">'+coName(r.site)+'</span>':''}</td><td>${manual?'':(r.satFlat?'<span class="muted">일당(퇴근 없음)</span>':(r.out||'<span class="warn-txt">미기록</span>'))}</td><td class="num">${manual?'':b+(r.breakAuto===false?'*':'')}</td><td class="num">${h==null?'-':hm(h)}</td>${showDate?`<td class="muted">${esc(r.note||'')}${r.edited?' ✎':''}</td>`:''}<td><button class="btn gray sm" onclick="openEdit('${r.date}','${r.id}')">수정</button></td></tr>`;
 }
 let todayCo='';
 function setTodayCo(btn){ todayCo=btn.dataset.co; btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===btn)); renderToday(); }
 function renderToday(){
   const d=todayStr(); document.getElementById('tDate').textContent=d+(todayCo?' · '+coName(todayCo):'');
   const rs=recsBetween(d,d).filter(r=>r.hours==null&&(!todayCo||empCo(r.empId)===todayCo)); const working=rs.filter(r=>!r.out&&!r.satFlat).length; const done=rs.filter(r=>r.out||r.satFlat).length; const hrs=rs.reduce((a,r)=>a+(calcHours(r)||0),0);
-  document.getElementById('tKpi').innerHTML=`<div><b>${working}</b><span>현재 근무중</span></div><div><b>${done}</b><span>퇴근 완료</span></div><div><b>${hrs.toFixed(2)}h</b><span>오늘 근무시간 합계</span></div><div><b>${sortedEmps(true,todayCo||null).length}</b><span>${todayCo?coName(todayCo):'전체'} 직원</span></div>${(n=>n?`<div style="background:#fffbeb"><b style="color:var(--amber)">${n}</b><span>휴가 신청 대기</span></div>`:'')(Object.values(S.leaves||{}).filter(l=>l.status==='req').length)}`;
+  document.getElementById('tKpi').innerHTML=`<div><b>${working}</b><span>현재 근무중</span></div><div><b>${done}</b><span>퇴근 완료</span></div><div><b>${hm(hrs)||'0분'}</b><span>오늘 근무시간 합계</span></div><div><b>${sortedEmps(true,todayCo||null).length}</b><span>${todayCo?coName(todayCo):'전체'} 직원</span></div>${(n=>n?`<div style="background:#fffbeb"><b style="color:var(--amber)">${n}</b><span>휴가 신청 대기</span></div>`:'')(Object.values(S.leaves||{}).filter(l=>l.status==='req').length)}`;
   document.getElementById('tBody').innerHTML=rs.length?rs.map(r=>rowHtml(r,false)).join(''):'<tr><td colspan="7" class="muted">오늘 기록 없음</td></tr>';
   const opens=recsBetween('0000','9999').filter(r=>r.hours==null&&!r.out&&!r.satFlat&&r.date<d&&(!todayCo||empCo(r.empId)===todayCo));
   document.getElementById('tOpenCard').classList.toggle('hidden',!opens.length);
@@ -634,14 +636,14 @@ function renderRecords(){
   const rs=recsBetween(f.value,t.value,document.getElementById('rEmp').value||null).filter(r=>!recCo||empCo(r.empId)===recCo).reverse();   /* 최근 기록이 위로 */
   document.getElementById('rBody').innerHTML=rs.length?rs.map(r=>rowHtml(r,true)).join(''):'<tr><td colspan="9" class="muted">기록 없음</td></tr>';
   const tot=rs.reduce((a,r)=>a+(calcHours(r)||0),0);
-  document.getElementById('rSum').textContent=`${rs.length}건 · 합계 ${tot.toFixed(2)}h · 휴게 뒤 * 표시 = 수동 입력`;
+  document.getElementById('rSum').textContent=`${rs.length}건 · 합계 ${hm(tot)||'0분'} · 휴게 뒤 * 표시 = 수동 입력`;
 }
 /* 고기마을 수동 입력 그리드 */
 function renderManual(){
   const [from]=periodRange(); const emps=sortedEmps(true,'MW');
   if(!emps.length){ document.getElementById('mGrid').innerHTML='<p class="muted">BMK 직원이 없습니다. 직원 관리에서 회사를 "BMK"로 추가하세요.</p>'; return; }
   let head='<tr><th>직원</th>'; for(let i=0;i<14;i++){ const d=addDays(from,i); const dow=parseDate(d).getDay(); head+=`<th style="text-align:center;${dow===0?'color:var(--red)':dow===6?'color:var(--blue)':''}">${d.slice(5).replace('-','/')}<br>${DOW[dow]}</th>`; if(i===6) head+='<th class="num">1주</th>'; } head+='<th class="num">2주</th><th class="num">합계</th></tr>';
-  let body=emps.map(e=>{ let w1=0,w2=0,tds=''; for(let i=0;i<14;i++){ const d=addDays(from,i); const dow=parseDate(d).getDay(); const {h}=hoursOn(d,e.id); if(i<7)w1+=h; else w2+=h; tds+=`<td style="text-align:center"><input type="number" class="grid-in ${dow===6?'sat':dow===0?'sun':''}" step="0.25" min="0" value="${h||''}" onchange="setManual('${d}','${e.id}',this.value)"></td>`; if(i===6) tds+=`<td class="num"><b>${w1.toFixed(2)}</b></td>`; } return `<tr><td><b>${esc(e.name)}</b></td>${tds}<td class="num"><b>${w2.toFixed(2)}</b></td><td class="num"><b>${(w1+w2).toFixed(2)}</b></td></tr>`; }).join('');
+  let body=emps.map(e=>{ let w1=0,w2=0,tds=''; for(let i=0;i<14;i++){ const d=addDays(from,i); const dow=parseDate(d).getDay(); const {h}=hoursOn(d,e.id); if(i<7)w1+=h; else w2+=h; tds+=`<td style="text-align:center"><input type="number" class="grid-in ${dow===6?'sat':dow===0?'sun':''}" step="0.25" min="0" value="${h||''}" onchange="setManual('${d}','${e.id}',this.value)"></td>`; if(i===6) tds+=`<td class="num"><b>${(hm(w1))}</b></td>`; } return `<tr><td><b>${esc(e.name)}</b></td>${tds}<td class="num"><b>${(hm(w2))}</b></td><td class="num"><b>${(hm(w1+w2))}</b></td></tr>`; }).join('');
   document.getElementById('mGrid').innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 function setManual(date,empId,val){
@@ -695,7 +697,7 @@ function periodData(){
 function renderPeriod(){
   const {rows}=periodData();
   const T=rows.reduce((a,o)=>({h:a.h+o.h,w1:a.w1+o.w1,w2:a.w2+o.w2}),{h:0,w1:0,w2:0});
-  document.getElementById('pBody').innerHTML=rows.length?rows.map(o=>`<tr><td>${esc(o.name)}</td><td><span class="tag ${o.company}">${coName(o.company)}</span></td><td class="num">${o.days.size}</td><td class="num"><b>${(roundHalf(o.w1)+roundHalf(o.w2)).toFixed(1)}</b></td><td class="num">${roundHalf(o.w1).toFixed(1)}</td><td class="num">${roundHalf(o.w2).toFixed(1)}</td><td>${o.missing?`<span class="warn-txt">퇴근 미기록 ${o.missing}건</span> `:''}${o.alt?`<span style="color:var(--mw)">타 회사 ${o.alt.toFixed(2)}h 포함</span> `:''}${o.leaveDays?`<span style="color:#b45309;font-weight:700">휴가 ${o.leaveDays}일</span>`:''}</td></tr>`).join('')+`<tr style="background:#eff6ff;font-weight:800"><td colspan="3">합계 (${rows.length}명)</td><td class="num">${rows.reduce((a,o)=>a+roundHalf(o.w1)+roundHalf(o.w2),0).toFixed(1)}</td><td class="num">${rows.reduce((a,o)=>a+roundHalf(o.w1),0).toFixed(1)}</td><td class="num">${rows.reduce((a,o)=>a+roundHalf(o.w2),0).toFixed(1)}</td><td></td></tr>`:'<tr><td colspan="7" class="muted">기록 없음</td></tr>';
+  document.getElementById('pBody').innerHTML=rows.length?rows.map(o=>`<tr><td>${esc(o.name)}</td><td><span class="tag ${o.company}">${coName(o.company)}</span></td><td class="num">${o.days.size}</td><td class="num"><b>${hm(roundHalf(o.w1)+roundHalf(o.w2))}</b></td><td class="num">${hm(roundHalf(o.w1))}</td><td class="num">${hm(roundHalf(o.w2))}</td><td>${o.missing?`<span class="warn-txt">퇴근 미기록 ${o.missing}건</span> `:''}${o.alt?`<span style="color:var(--mw)">타 회사 ${hm(o.alt)} 포함</span> `:''}${o.leaveDays?`<span style="color:#b45309;font-weight:700">휴가 ${o.leaveDays}일</span>`:''}</td></tr>`).join('')+`<tr style="background:#eff6ff;font-weight:800"><td colspan="3">합계 (${rows.length}명)</td><td class="num">${hm(rows.reduce((a,o)=>a+roundHalf(o.w1)+roundHalf(o.w2),0))}</td><td class="num">${hm(rows.reduce((a,o)=>a+roundHalf(o.w1),0))}</td><td class="num">${hm(rows.reduce((a,o)=>a+roundHalf(o.w2),0))}</td><td></td></tr>`:'<tr><td colspan="7" class="muted">기록 없음</td></tr>';
 }
 function download(name,content,type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([content],{type})); a.download=name; a.click(); }
 function csvRows(rs){ return ['날짜,요일,직원,회사,출근,퇴근,휴게(분),근무(h),메모',...rs.map(r=>[r.date,DOW[parseDate(r.date).getDay()],empName(r.empId),coName(empCo(r.empId)),r.in||'',r.out||'',calcBreak(r),calcHours(r)??'',(r.note||'').replace(/,/g,' ')].join(','))].join('\n'); }
